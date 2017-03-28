@@ -22,7 +22,7 @@ import org.gradle.api.internal.tasks.testing.TestClassProcessor;
 import org.gradle.api.internal.tasks.testing.TestClassRunInfo;
 import org.gradle.api.internal.tasks.testing.TestResultProcessor;
 import org.gradle.api.internal.tasks.testing.WorkerTestClassProcessorFactory;
-import org.gradle.internal.operations.BuildOperationWorkerRegistry;
+import org.gradle.internal.work.WorkerLeaseRegistry;
 import org.gradle.internal.remote.ObjectConnection;
 import org.gradle.process.JavaForkOptions;
 import org.gradle.process.internal.worker.WorkerProcess;
@@ -41,13 +41,13 @@ public class ForkingTestClassProcessor implements TestClassProcessor {
     private final Iterable<File> classPath;
     private final Action<WorkerProcessBuilder> buildConfigAction;
     private final ModuleRegistry moduleRegistry;
-    private final BuildOperationWorkerRegistry.Operation owner;
+    private final WorkerLeaseRegistry.WorkerLease owner;
     private RemoteTestClassProcessor remoteProcessor;
     private WorkerProcess workerProcess;
     private TestResultProcessor resultProcessor;
-    private BuildOperationWorkerRegistry.Completion workerCompletion;
+    private WorkerLeaseRegistry.WorkerLeaseCompletion workerCompletion;
 
-    public ForkingTestClassProcessor(WorkerProcessFactory workerFactory, WorkerTestClassProcessorFactory processorFactory, JavaForkOptions options, Iterable<File> classPath, Action<WorkerProcessBuilder> buildConfigAction, ModuleRegistry moduleRegistry, BuildOperationWorkerRegistry.Operation owner) {
+    public ForkingTestClassProcessor(WorkerProcessFactory workerFactory, WorkerTestClassProcessorFactory processorFactory, JavaForkOptions options, Iterable<File> classPath, Action<WorkerProcessBuilder> buildConfigAction, ModuleRegistry moduleRegistry, WorkerLeaseRegistry.WorkerLease owner) {
         this.workerFactory = workerFactory;
         this.processorFactory = processorFactory;
         this.options = options;
@@ -65,7 +65,7 @@ public class ForkingTestClassProcessor implements TestClassProcessor {
     @Override
     public void processTestClass(TestClassRunInfo testClass) {
         if (remoteProcessor == null) {
-            workerCompletion = owner.operationStart();
+            workerCompletion = owner.startChild();
             remoteProcessor = forkProcess();
         }
 
@@ -121,7 +121,7 @@ public class ForkingTestClassProcessor implements TestClassProcessor {
                 remoteProcessor.stop();
                 workerProcess.waitForStop();
             } finally {
-                workerCompletion.operationFinish();
+                workerCompletion.leaseFinish();
             }
         }
     }
